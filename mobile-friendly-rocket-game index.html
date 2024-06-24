@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>火箭捕捉遊戲 - 移動端適配版</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        #game-container {
+            width: 100%;
+            height: 80vh;
+            background-color: #e2e8f0;
+            position: relative;
+            overflow: hidden;
+        }
+        #rocket, .target, .obstacle {
+            position: absolute;
+            font-size: 24px;
+        }
+        #score, #level {
+            position: absolute;
+            top: 10px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        #score { left: 10px; }
+        #level { right: 10px; }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        button {
+            margin: 0 5px;
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border: none;
+            border-radius: 5px;
+        }
+        #angle-display {
+            position: absolute;
+            bottom: 50px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="score">得分: 0</div>
+        <div id="level">等級: 1</div>
+        <div id="rocket">🚀</div>
+    </div>
+    <div id="angle-display">角度: 0°</div>
+    <div id="controls">
+        <button id="left-btn">←</button>
+        <button id="launch-btn">發射</button>
+        <button id="right-btn">→</button>
+    </div>
+
+    <script>
+        const ANIMAL_EMOJIS = ['🐶', '🐱', '🐰', '🦊', '🐼', '🐨', '🐯', '🦁', '🐸', '🐷'];
+        const OBSTACLE_EMOJI = '🌳';
+        let score = 0;
+        let level = 1;
+        let rocketPosition = 0;
+        let rocketX = 50;
+        let rocketAngle = 0;
+        let isLaunched = false;
+        let targets = [];
+        let obstacles = [];
+        const gameContainer = document.getElementById('game-container');
+        const rocket = document.getElementById('rocket');
+        const scoreDisplay = document.getElementById('score');
+        const levelDisplay = document.getElementById('level');
+        const angleDisplay = document.getElementById('angle-display');
+
+        function createTarget() {
+            const target = document.createElement('div');
+            target.className = 'target';
+            target.style.left = Math.random() * 90 + '%';
+            target.style.top = Math.random() * 40 + '%';
+            target.innerHTML = ANIMAL_EMOJIS[Math.floor(Math.random() * ANIMAL_EMOJIS.length)];
+            target.dx = (Math.random() - 0.5) * 2 * (1 + level * 0.1);
+            target.dy = (Math.random() - 0.5) * 2 * (1 + level * 0.1);
+            gameContainer.appendChild(target);
+            targets.push(target);
+        }
+
+        function createObstacle() {
+            const obstacle = document.createElement('div');
+            obstacle.className = 'obstacle';
+            obstacle.style.left = Math.random() * 90 + '%';
+            obstacle.style.top = Math.random() * 60 + '%';
+            obstacle.innerHTML = OBSTACLE_EMOJI;
+            gameContainer.appendChild(obstacle);
+            obstacles.push(obstacle);
+        }
+
+        function updateRocket() {
+            rocket.style.left = `${rocketX}%`;
+            rocket.style.bottom = `${rocketPosition}%`;
+            rocket.style.transform = `translateX(-50%) rotate(${rocketAngle}deg)`;
+        }
+
+        function adjustAngle(delta) {
+            if (!isLaunched) {
+                rocketAngle = Math.max(-45, Math.min(45, rocketAngle + delta));
+                angleDisplay.textContent = `角度: ${rocketAngle}°`;
+                updateRocket();
+            }
+        }
+
+        function launch() {
+            if (!isLaunched) {
+                isLaunched = true;
+                const launchInterval = setInterval(() => {
+                    rocketPosition += 2;
+                    rocketX += Math.tan(rocketAngle * Math.PI / 180) * 2;
+                    rocketX = Math.max(0, Math.min(100, rocketX));
+                    updateRocket();
+                    checkCollision();
+                    if (rocketPosition >= 100 || rocketX <= 0 || rocketX >= 100) {
+                        clearInterval(launchInterval);
+                        resetRocket();
+                    }
+                }, 50);
+            }
+        }
+
+        function resetRocket() {
+            isLaunched = false;
+            rocketPosition = 0;
+            rocketX = 50;
+            rocketAngle = 0;
+            updateRocket();
+            angleDisplay.textContent = `角度: ${rocketAngle}°`;
+        }
+
+        function checkCollision() {
+            const rocketRect = rocket.getBoundingClientRect();
+            
+            targets.forEach((target, index) => {
+                const targetRect = target.getBoundingClientRect();
+                if (rocketRect.left < targetRect.right &&
+                    rocketRect.right > targetRect.left &&
+                    rocketRect.top < targetRect.bottom &&
+                    rocketRect.bottom > targetRect.top) {
+                    score++;
+                    scoreDisplay.textContent = `得分: ${score}`;
+                    gameContainer.removeChild(target);
+                    targets.splice(index, 1);
+                    createTarget();
+                    if (score % 5 === 0) {
+                        level++;
+                        levelDisplay.textContent = `等級: ${level}`;
+                        createObstacle();
+                    }
+                }
+            });
+
+            obstacles.forEach((obstacle) => {
+                const obstacleRect = obstacle.getBoundingClientRect();
+                if (rocketRect.left < obstacleRect.right &&
+                    rocketRect.right > obstacleRect.left &&
+                    rocketRect.top < obstacleRect.bottom &&
+                    rocketRect.bottom > obstacleRect.top) {
+                    resetRocket();
+                }
+            });
+        }
+
+        function moveTargets() {
+            targets.forEach(target => {
+                let x = parseFloat(target.style.left);
+                let y = parseFloat(target.style.top);
+                x += target.dx;
+                y += target.dy;
+                if (x < 0 || x > 90) target.dx *= -1;
+                if (y < 0 || y > 40) target.dy *= -1;
+                target.style.left = `${x}%`;
+                target.style.top = `${y}%`;
+            });
+        }
+
+        function gameLoop() {
+            moveTargets();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 初始化遊戲
+        for (let i = 0; i < 3; i++) {
+            createTarget();
+        }
+        updateRocket();
+        gameLoop();
+
+        // 移動端控制
+        document.getElementById('left-btn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            adjustAngle(-5);
+        });
+        document.getElementById('right-btn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            adjustAngle(5);
+        });
+        document.getElementById('launch-btn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            launch();
+        });
+
+        // 防止頁面縮放
+        document.addEventListener('touchmove', (e) => {
+            if (e.scale !== 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    </script>
+</body>
+</html>
